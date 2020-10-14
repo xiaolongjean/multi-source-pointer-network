@@ -754,9 +754,8 @@ class MS_Pointer(nn.Module):
 
                 pred_corpus = [[word_list[0:2]] for word_list in predicted_tokens[:,0,:].tolist()]
 
-                bleu_score = corpus_bleu(pred_corpus, batch["target_word_list"], weights=[0.5,0.5])
+                bleu_score = corpus_bleu(pred_corpus, batch["target_word_list"], weights=[0.5, 0.5])
                 all_batch_bleu += bleu_score 
-
                 #bleu_score = self.bleu_scorer(predicted_tokens[:,0,:].tolist(), batch["target_word_list"])
 
                 batch_elapsed_time = round(time.time() - batch_start_time, 2)

@@ -8,7 +8,6 @@ import os
 import subprocess
 import torch
 import torch.nn as nn
-import prettytable as pt
 from math import ceil
 from nltk.translate.bleu_score import sentence_bleu
 from nltk.translate.bleu_score import corpus_bleu
@@ -219,110 +218,6 @@ def weighted_sum(matrix: torch.Tensor, attention: torch.Tensor) -> torch.Tensor:
         matrix = matrix.expand(*expanded_size)
     intermediate = attention.unsqueeze(-1).expand_as(matrix) * matrix
     return intermediate.sum(dim=-2)
-
-
-
-
-# TODO 下面版本的POSitional Embedding暂时不能使用。
-class PositionalEmbedding(nn.Module):
-    def __init__(self, emb_dim):
-        super(PositionalEmbedding, self).__init__()
-
-        self.emb_dim = emb_dim
-
-        inv_freq = 1 / (10000 ** (torch.arange(0.0, emb_dim, 2.0) / emb_dim))
-        self.register_buffer('inv_freq', inv_freq)
-        
-    # pos_seq =  pos_seq = torch.arange(seq_len-1, -1, -1.0)
-    def forward(self, pos_seq, batch_size=None):
-        sinusoid_inp = torch.ger(pos_seq, self.inv_freq)
-        pos_emb = torch.cat([sinusoid_inp.sin(), sinusoid_inp.cos()], dim=-1)
-
-        if batch_size is not None:
-            return pos_emb[:,None,:].expand(-1, batch_size, -1)
-        else:
-            return pos_emb[:,None,:]
-
-
-
-
-class LambdaWeightGateLayer(nn.Module):
-    """docstring for GateNet"""
-    def __init__(self, 
-                 curr_d_node, prev_y_node, cont_1_node, cont_2_node ):
-        super(GateNet, self).__init__()
-
-        self.curr_d_node = nn.Linear(in_features = curr_d_node[0], out_features = curr_d_node[1])
-        self.prev_y_node = nn.Linear(in_features = prev_y_node[0], out_features = prev_y_node[1])
-        self.cont_1_node = nn.Linear(in_features = cont_1_node[0], out_features = cont_1_node[1])
-        self.cont_2_node = nn.Linear(in_features = cont_2_node[0], out_features = cont_2_node[1])
-        
-    def forward(curr_d, prev_y, content_1, content_2):
-        curr_d_out = self.curr_d_node(curr_d)
-        prev_y_out = self.prev_y_node(prev_y)
-        content_1_out = self.cont_1_node(content_1)
-        content_2_out = self.cont_2_node(content_2)
-        gate_out = torch.sigmoid(curr_d_out + prev_y_out + content_1_out + content_2_out)
-
-        return gate_out
-
-
-
-
-# class InfoPrinter(object):
-#     """docstring for InfoPrinter"""
-#     def __init__(self, header):
-#         super(InfoPrinter, self).__init__()
-#         self.table = pt.PrettyTable(border=True)
-#         self.table.field_names = header
-#         self.screen_clear_command = "cls" if "win" in sys.platform else "clear"
-#         self.col_num = len(header)
-#         self.row_info_list = self.update_extra_info()
-        
-
-
-
-#     def update_extra_info(self):
-#         extra_header = []
-#         extra_column = []
-#         row_info_list = []
-
-#         peak_cpu_usage = peak_memory_mb()
-#         gpu_memory_info = gpu_memory_mb().items()
-#         extra_header.append("CPU_Info")
-#         extra_column.append("\033[30m%s\033[0m" % peak_cpu_usage)
-#         for gpu, memory in gpu_memory_info:
-#             extra_header.append(gpu)
-#             extra_column.append("\033[30m%sMb\033[0m" % memory)
-#         need_row_num = ceil(len(extra_header)/(self.col_num * 1.0))
-
-#         extra_header += [""] * (need_row_num * self.col_num - len(extra_header))
-#         extra_column += [""] * (need_row_num * self.col_num - len(extra_column))
-
-#         for row_id in range(need_row_num):
-#             row_info_list.append(extra_header[row_id*self.col_num : (row_id + 1)*self.col_num])
-#             row_info_list.append(extra_column[row_id*self.col_num : (row_id + 1)*self.col_num])
-#         return row_info_list
-
-
-
-
-#     def print_train_info(self, info, epoch, update_extroinfo_freq):
-#         sys.stdout.write("\n\n\n")
-#         #sys.stdout.write("------------Training Info------------\n")
-#         if epoch % update_extroinfo_freq == 0:
-#             self.row_info_list = self.update_extra_info()
-#         self.table.clear_rows()
-#         self.table.add_row(info)
-#         for row in self.row_info_list:
-#             self.table.add_row(row)
-
-#         os.system(self.screen_clear_command)
-#         sys.stdout.write("{0}".format(self.table))
-#         sys.stdout.flush() 
-#         sys.stdout.write("\n")
-
-
 
 
 

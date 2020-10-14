@@ -22,7 +22,6 @@ import time
 import logging
 import torch
 import torch.nn as nn
-import prettytable as pt
 import datetime
 from tqdm import tqdm
 from model import MS_Pointer
@@ -204,7 +203,9 @@ def test(args):
 if __name__ == "__main__":
     # Basic Config ...
     args = config()
+    
     # Model Training ...
     train(args)
+    
     # Model Testing ...
-    test(args)
+    #test(args)
