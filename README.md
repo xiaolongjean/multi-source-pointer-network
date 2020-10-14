@@ -6,7 +6,7 @@
 
 ### 一、模型说明：
 
-:pray: 基于论文"**Multi-Source Pointer Network for Product Title Summarization**"开发，模型的具体介绍以及短标题的生成参考： https://mp.weixin.qq.com/s/5rAM44D50JHE-q1IrLEatw，在论文的基础上进行了如下几方面的优化：
+:pray: 基于论文"**Multi-Source Pointer Network for Product Title Summarization**"开发，模型的具体介绍以及短标题的生成参考： [https://mp.weixin.qq.com/s/5rAM44D50JHE-q1IrLEatw](https://mp.weixin.qq.com/s/5rAM44D50JHE-q1IrLEatw "https://mp.weixin.qq.com/s/5rAM44D50JHE-q1IrLEatw")，在论文的基础上进行了如下几方面的优化：
 
 - :one: 融合多特征，解决测试阶段多个OOV词汇共享同一个Embedding的问题。
 
