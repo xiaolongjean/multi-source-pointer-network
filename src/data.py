@@ -97,52 +97,8 @@ class DataUtils(object):
 
 
 
+
     def construct_dict(self):
-        """从训练数据中构建词典"""
-        print("\nConstructing Dict ...\n")
-        self.train_lines = self.read_lines_from_file(self.train_data_path, with_target=True)
-        self.valid_lines = self.read_lines_from_file(self.valid_data_path, with_target=True)
-        if self.test_data_path is not None:
-            self.test_lines  = self.read_lines_from_file(self.test_data_path, with_target=True)
-        else:
-            self.test_lines  = None
-
-        self.word2index = {self.PAD_token: self.PAD_idx, self.BOS_token:self.BOS_idx, self.EOS_token:self.EOS_idx, self.OOV_token:self.OOV_idx}
-        self.char2index = {self.PAD_token: self.PAD_idx, self.BOS_token:self.BOS_idx, self.EOS_token:self.EOS_idx, self.OOV_token:self.OOV_idx}
-
-        def update_dict(lines):
-            for line in lines:
-                source1_words, source2_words = line[0], line[1]
-                for word in source1_words + source2_words:
-                    if len(word) < 1 or word in self.word2index or word == self.BOS_token:
-                        continue
-                    self.word2index[word] = len(self.word2index)
-                    for char in word:
-                        if char in self.char2index:
-                            continue
-                        self.char2index[char] = len(self.char2index)
-        
-        update_dict(self.train_lines)
-        # update_dict(self.valid_lines)
-        self.index2word = {v:k for k,v in self.word2index.items()}
-        self.index2char = {v:k for k,v in self.char2index.items()}
-
-        self.flag_constructed_dict = True
-        vocab_file = {"word2index": self.word2index, "char2index": self.char2index}
-        torch.save(vocab_file, self.args.vocab_file)
-        print(color("\nSuccessfully Constructed Dict.", 2))
-        print(color("\nVocabulary File Has Been Saved.", 1))
-        print("\nNumber of words: ", color(len(self.word2index), 2))
-        print("Number of chars: ", color(len(self.char2index), 2),"\n\n")
-
-        return self.word2index, self.char2index, self.index2word, self.index2char
-
-
-
-
-
-
-    def construct_dict_v2(self):
         """从训练数据中构建词典"""
         print("\nConstructing Dict ...\n")
         self.train_lines = self.read_lines_from_file(self.train_data_path, with_target=True)
@@ -293,7 +249,7 @@ class DataUtils(object):
 
     def obtain_formatted_data(self, ):
         if not self.flag_constructed_dict:
-            self.construct_dict_v2()
+            self.construct_dict()
 
         train_data = self.obtain_formatted_lines(self.train_lines, with_target=True)
         valid_data = self.obtain_formatted_lines(self.valid_lines, with_target=True)
@@ -433,7 +389,7 @@ if __name__ == "__main__":
     args.test_data_path  = "../data/test.dat"
 
     data_loader = DataUtils(args)
-    data_loader.construct_dict_v2()
+    data_loader.construct_dict()
     train_data, valid_data, test_data = data_loader.obtain_data()
 
     word2index, index2word, char2index, index2char = data_loader.word2index, data_loader.index2word, \

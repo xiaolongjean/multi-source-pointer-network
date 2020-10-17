@@ -72,7 +72,6 @@ def train(args):
 
     logger.info(color("Initializing Data Loader ... \n", 1))
     data_loader = DataUtils(args)
-    # data_loader.construct_dict()
     device = set_cuda_device(args.cuda_device)
 
     logger.info(color("Processing Data ... \n", 1))

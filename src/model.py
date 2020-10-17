@@ -42,11 +42,10 @@ class PositionalEmbedding(nn.Module):
     def __init__(self, d_model, max_seq_len):
         super(PositionalEmbedding, self).__init__()
         
-        # 根据论文给的公式，构造出PE矩阵
         position_encoding = np.array([
           [pos / pow(10000, 2.0 * (j // 2) / d_model) for j in range(d_model)]
           for pos in range(max_seq_len)])
-        # 偶数列使用sin，奇数列使用cos
+        
         position_encoding[:, 0::2] = np.sin(position_encoding[:, 0::2])
         position_encoding[:, 1::2] = np.cos(position_encoding[:, 1::2])
         position_encoding = torch.tensor(position_encoding).float()
@@ -57,12 +56,8 @@ class PositionalEmbedding(nn.Module):
         self.position_encoding = nn.Embedding(max_seq_len + 1, d_model)#.to(device)
         self.position_encoding.weight = nn.Parameter(position_encoding, requires_grad=False)#.to(device)
         self.max_seq_len = max_seq_len
-        
-        
-        
+
     def forward(self, input_len):
-        # 对每一个序列的位置进行对齐，在原序列位置的后面补上0
-        # 这里range从1开始也是因为要避开PAD(0)的位置
         device = input_len.device
         input_pos = torch.LongTensor(
           [list(range(1, len + 1)) + [0] * (self.max_seq_len - len.item()) for len in input_len]).to(device)
@@ -203,15 +198,10 @@ class MS_Pointer(nn.Module):
             self.decoder_hidden_layernorm  = nn.LayerNorm(normalized_shape = self.decoder_output_dim)
             self.decoder_cell_layernorm    = nn.LayerNorm(normalized_shape = self.decoder_output_dim)
 
-        # self.bleu_scorer = BLEU(exclude_indices={self.PAD_token, self.BOS_token, self.EOS_token})
-
-        # self.criterion=nn.BCEWithLogitsLoss()
-        # self.criterion=nn.MultiLabelSoftMarginLoss()
 
 
 
 
-    # TODO 后面可能需要修改。
     def get_target_token_embeddings(self, target_token_ids, max_seq_len=None):
         """
         args:
@@ -253,7 +243,7 @@ class MS_Pointer(nn.Module):
 
 
 
-    #@overrides
+
     def encode(self, batch_input):
         source1_input_words_ids = batch_input["source1_input_words_ids"]
         source1_input_chars_ids = batch_input["source1_input_chars_ids"]
@@ -297,7 +287,6 @@ class MS_Pointer(nn.Module):
 
 
 
-    #【注意】 相关字段需要利用beam size进行广播。
     def get_initial_model_state(self, batch_input):
 
         model_state = {}
@@ -415,7 +404,7 @@ class MS_Pointer(nn.Module):
             target_to_source1 = (batch_input["source1_input_words_ids"] == target_words_ids[:, timestep+1].unsqueeze(-1))
             target_to_source2 = (batch_input["source2_input_words_ids"] == target_words_ids[:, timestep+1].unsqueeze(-1))
 
-            step_log_likelihood = self.get_negative_log_likelihood_v2(model_state["source1_decoder_attention_score"],
+            step_log_likelihood = self.get_negative_log_likelihood(model_state["source1_decoder_attention_score"],
                                     model_state["source2_decoder_attention_score"], source1_token_mask, source2_token_mask,
                                     target_to_source1, target_to_source2, target_words_ids, model_state["gate_score"])
 
@@ -423,21 +412,16 @@ class MS_Pointer(nn.Module):
 
         # 将各个时间步的对数似然合并成一个tensor
         # shape: (batch_size, num_decoding_steps = target_seq_len - 1)
-        # print(step_log_likelihoods, "\n\n\n")
         log_likelihoods = torch.cat(step_log_likelihoods, -1)
 
         # 去掉第一个，不会作为目标词的START
         # shape: (batch_size, num_decoding_steps = target_seq_len - 1)
         target_mask = target_mask[:, 1:].float()
-        #print(target_mask)
-        #print("\n\ntarget_mask: ", target_mask.shape)
-        #print("log_likelihoods:" , log_likelihoods.shape)
 
         # 将各个时间步上的对数似然tensor使用mask累加，得到整个时间序列的对数似然
         log_likelihood = (log_likelihoods * target_mask)#.sum(dim=-1)
         log_likelihood = log_likelihoods.sum(dim=-1)
         batch_loss = - log_likelihood.sum()
-        # batch_loss =  log_likelihood.sum()
         mean_loss = batch_loss / batch_size
 
         return {"mean_loss": mean_loss, "batch_loss": batch_loss}
@@ -449,58 +433,19 @@ class MS_Pointer(nn.Module):
                                     source1_token_mask, source2_token_mask, target_to_source1,
                                     target_to_source2, target_tokens, gate_score):
 
-        # 计算第一个source的分值
-        # shape: (batch_size, seq_max_len_1)
-        combined_log_probs_1 = (source1_decoder_attention_score + 1e-45).log() + (target_to_source1.float() + 1e-45).log() #\
-                             #+ (source1_token_mask.float() + 1e-45).log()
-        # shape: (batch_size,)
-        log_probs_1 = logsumexp(combined_log_probs_1)  # log(exp(a[0]) + ... + exp(a[L]))
-
-        # 计算第二个source的分值
-        # shape: (batch_size, seq_max_len_2)
-        combined_log_probs_2 = (source2_decoder_attention_score + 1e-45).log() + (target_to_source2.float() + 1e-45).log() #\
-                             #+ (source2_token_mask.float() + 1e-45).log()
-        # shape: (batch_size,)
-        log_probs_2 = logsumexp(combined_log_probs_2)  # log(exp(a[0]) + ... + exp(a[L]))
-
-
-        # 计算 log(p1 * gate + p2 * (1-gate))
-        log_gate_score_1 = (gate_score + 1e-45).log()  # shape: (batch_size,)
-        log_gate_score_2 = (1 - gate_score + 1e-45).log()  # shape: (batch_size,)
-        
-        item_1 = (log_gate_score_1 + log_probs_1).unsqueeze(-1)  # shape: (batch_size, 1)
-        item_2 = (log_gate_score_2 + log_probs_2).unsqueeze(-1)  # shape: (batch_size, 1)
-        step_log_likelihood = logsumexp(torch.cat((item_1, item_2), -1))  # shape: (batch_size,)
-
-
-        return step_log_likelihood
-
-
-
-
-
-
-    def get_negative_log_likelihood_v2(self, source1_decoder_attention_score, source2_decoder_attention_score,
-                                    source1_token_mask, source2_token_mask, target_to_source1,
-                                    target_to_source2, target_tokens, gate_score):
-
-        # 计算第一个source的分值
         # shape: (batch_size, seq_max_len_1)
         combined_log_probs_1 = ((source1_decoder_attention_score * target_to_source1.float()).sum(-1) + 1e-20).log()
-                             #+ (source1_token_mask.float() + 1e-45).log()
 
         # shape: (batch_size, seq_max_len_2)
         combined_log_probs_2 = ((source2_decoder_attention_score * target_to_source2.float()).sum(-1) + 1e-20).log()
-                             #+ (source2_token_mask.float() + 1e-45).log()
-        # shape: (batch_size,)
-        
+
         # 计算 log(p1 * gate + p2 * (1-gate))
         log_gate_score_1 = (gate_score + 1e-20).log()  # shape: (batch_size,)
         log_gate_score_2 = (1 - gate_score + 1e-20).log()  # shape: (batch_size,)
         
-        item_1 = (log_gate_score_1 + combined_log_probs_1).unsqueeze(-1)  # shape: (batch_size, 1)
-        item_2 = (log_gate_score_2 + combined_log_probs_2).unsqueeze(-1)  # shape: (batch_size, 1)
-        step_log_likelihood = logsumexp(torch.cat((item_1, item_2), -1))  # shape: (batch_size,)
+        item_1 = (log_gate_score_1 + combined_log_probs_1).unsqueeze(-1)  
+        item_2 = (log_gate_score_2 + combined_log_probs_2).unsqueeze(-1)  
+        step_log_likelihood = logsumexp(torch.cat((item_1, item_2), -1))  
 
 
         return step_log_likelihood
@@ -516,32 +461,11 @@ class MS_Pointer(nn.Module):
                               gate_score):
         """
         根据三个概率，计算全词表上的对数似然。
-
-        参数：
-            - copy_scores_1：第一个source的复制概率（经过归一化）
-                    shape: (group_size, seq_max_len_1)
-            - copy_scores_2：第二个source的复制概率（经过归一化）
-                    shape: (group_size, seq_max_len_2)
-            - gate_score：门控的分数，决定source1共享多少比例（source2即贡献1-gate_score）
-                    shape: (group_size,)
-            - state：当前时间步，更新后的解码状态
-        
-        返回：
-            - final_log_probs：全词表上的概率
-                    shape: (group_size, target_vocab_size)
         """
         # 获取group_size和两个序列的长度
         group_size, seq_max_len_1 = source1_decoder_attention_score.size()
         group_size, seq_max_len_2 = source2_decoder_attention_score.size()
 
-        # TODO: 这里默认了source和target使用同一个词表映射，否则需要source2target的映射
-        #      （即source词在target词表的index），才能进行匹配
-        # shape: (group_size, seq_max_len_1)
-        #source_token_ids_1 = state["source_token_ids_1"]
-        # shape: (group_size, seq_max_len_2)
-        #source_token_ids_2 = state["source_token_ids_2"]
-
-        # 在序列上扩展gate_score
         # 需要和source1相乘的gate概率，shape: (group_size, seq_max_len_1)
         gate_1 = gate_score.expand(seq_max_len_1, -1).t()
         # 需要和source2相乘的gate概率，shape: (group_size, seq_max_len_2)
@@ -597,7 +521,6 @@ class MS_Pointer(nn.Module):
         model_state = self.decode_step(previous_token_ids, model_state)
         
         # 计算两个source的对数似然的合并结果
-        #final_log_probs = self._gather_final_log_probs(copy_scores_1, copy_scores_2, gate_score, state)
         final_log_probs = self.merge_final_log_probs(model_state["source1_decoder_attention_score"],
                                                      model_state["source2_decoder_attention_score"],
                                                      model_state["source1_local_words_ids"], 
@@ -653,7 +576,6 @@ class MS_Pointer(nn.Module):
 
 
 
-
     def predict_single_batch(self, batch_input):
         self.eval()
 
@@ -694,10 +616,7 @@ class MS_Pointer(nn.Module):
         self.eval()
 
         all_batch_test_data =  self.test_data_utils.get_batch_formatted_test_data(raw_test_data, device=self.device)
-
-
         with torch.no_grad():
-            #all_batch_predicted_result = []
             all_batch_predicted_tokens = []
             all_batch_predicted_probs  = []
 
@@ -707,7 +626,6 @@ class MS_Pointer(nn.Module):
                 all_batch_predicted_probs  += predicted_log_probs.softmax(-1).tolist()
 
         return all_batch_predicted_tokens, all_batch_predicted_probs
-
 
 
 
@@ -727,12 +645,7 @@ class MS_Pointer(nn.Module):
 
 
 
-
-
     def validation(self, all_batch_data, need_pred_result):
-        # assert not need_valid_loss and not need_pred_result , \
-        #         color("'need_valid_loss' and 'need_pred_result' should not both be 'False'.", 1)
-
         all_batch_predicted_tokens = []
         all_batch_predicted_probs  = []
         batch_size = len(all_batch_data)
@@ -751,12 +664,9 @@ class MS_Pointer(nn.Module):
                 all_batch_predicted_probs  += predicted_log_probs.tolist()
                 all_batch_loss += valid_loss["batch_loss"].detach().cpu().item()
 
-
                 pred_corpus = [[word_list[0:2]] for word_list in predicted_tokens[:,0,:].tolist()]
-
                 bleu_score = corpus_bleu(pred_corpus, batch["target_word_list"], weights=[0.5, 0.5])
                 all_batch_bleu += bleu_score 
-                #bleu_score = self.bleu_scorer(predicted_tokens[:,0,:].tolist(), batch["target_word_list"])
 
                 batch_elapsed_time = round(time.time() - batch_start_time, 2)
                 info = color("[Valid] ",1) + "Batch:" + color(idx,2) + " BLEU:" + color(round(bleu_score,5),1)  + " Loss:" + color(round(mean_loss, 5),1) + " Time:" + color(batch_elapsed_time, 2)
