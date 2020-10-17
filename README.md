@@ -9,7 +9,7 @@
 
 :pray: 基于论文"**Multi-Source Pointer Network for Product Title Summarization**"开发，模型的具体介绍以及短标题的生成参考： [https://mp.weixin.qq.com/s/5rAM44D50JHE-q1IrLEatw](https://mp.weixin.qq.com/s/5rAM44D50JHE-q1IrLEatw "https://mp.weixin.qq.com/s/5rAM44D50JHE-q1IrLEatw")，在论文的基础上进行了如下几方面的优化：
 
-- :one: 融合多特征，解决测试阶段多个OOV词汇共享同一个Embedding的问题。
+- :one: 融合词语和字符特征，解决测试阶段多个OOV词汇共享同一个Embedding的问题。
 
 - :two: 针对不同特征，编码器采用多组Transformer，然后对特征进行了融合。
 
@@ -41,14 +41,13 @@
      ```python
      python3 main.py --train_data_path ../data/train.dat \
                      --valid_data_path ../data/valid.dat \
-                     --test_data_path ../data/test.dat \
                      --model_dir ../model/ \
                      --max_epoch 50
      ```
 
 3. #### 模型预测：
 
-   - 预测阶段利用到的是 `main.py` 脚本中的 `test()` 函数，训练阶段需要把 `train()` 函数注释掉。。
+   - 预测阶段利用到的是 `main.py` 脚本中的 `test()` 函数，预测阶段需要把 `train()` 函数注释掉。
    - 预测阶段，可以参考 `main.py` 脚本中给定的测试数据格式、模型加载方式等进行预测。
    - 需要注意的是：模型预测阶段也是以batch的方式进行的，因此在预测时需要参考 `main.py` 脚本中的 `test()` 函数，将数据准备成batch的形式。
 
