@@ -11,9 +11,6 @@ import random
 from math import ceil
 from numpy import array
 from utils import color
-# from random import shuffle
-# from torch.utils.data import DataLoader
-
 
 
 
@@ -42,7 +39,6 @@ class DataUtils(object):
         self.BOS_token = args.BOS_token
         self.EOS_token = args.EOS_token
         self.OOV_token  =args.OOV_token
-        
         self.flag_constructed_dict = False
 
 
@@ -96,8 +92,6 @@ class DataUtils(object):
 
 
 
-
-
     def construct_dict(self):
         """从训练数据中构建词典"""
         print("\nConstructing Dict ...\n")
@@ -132,8 +126,6 @@ class DataUtils(object):
 
 
 
-
-
     def padding_and_covert_to_idx(self, line, data_type):
         """
         args:
@@ -148,7 +140,6 @@ class DataUtils(object):
         """
 
         assert data_type in ["source1", "source2", "target"], "'data_type' should be in ['source1', 'source2', 'target']"
-        
         max_token_len = self.max_token_len
         if data_type in ["source1", "source2"]:
             max_seq_len = self.max_seq_len
@@ -157,7 +148,6 @@ class DataUtils(object):
 
         padded_word_ids = [self.BOS_idx]
         padded_char_ids = [max_token_len * [self.BOS_idx]]
-
         seq_len = len(line) + 1  if len(line) < max_seq_len else max_seq_len #此处加1是因为前面有'#BOS#'
 
         for word in line:
@@ -171,8 +161,6 @@ class DataUtils(object):
         padded_word_ids.insert(0, self.BOS_idx)
         padded_char_ids.insert(0, self.max_target_len * [self.BOS_idx])
 
-
-        # TODO 此处在后面填充的字符。
         N = max_seq_len - len(padded_word_ids)
         padded_word_ids = padded_word_ids + N * [self.PAD_idx] if N>0 else padded_word_ids[:max_seq_len]
 
@@ -189,7 +177,6 @@ class DataUtils(object):
     def get_merged_source_word_ids(self, source1_word_list, source2_word_list):
 
         merged_source_word_list = list(set(source1_word_list).union(set(source2_word_list))) 
-        #TODO 注意此处的填充符号。
         merged_source_word_list = merged_source_word_list + (2* self.max_seq_len - len(merged_source_word_list)) * [self.PAD_token]
         merged_source_local_ids = [self.word2index.get(word, self.OOV_idx) for word in merged_source_word_list]
         merged_source_local_mask = [1 if idx != self.PAD_idx and idx != self.BOS_idx else 0 for idx in merged_source_local_ids]
@@ -205,7 +192,6 @@ class DataUtils(object):
 
         return (merged_source_word_list, merged_source_local_ids, source1_local_word_ids, 
                 source2_local_word_ids, merged_source_local_mask, merged_source_global_ids)
-
 
 
 
@@ -231,7 +217,6 @@ class DataUtils(object):
 
 
 
-
     def obtain_formatted_lines(self, lines, with_target):
         formatted_lines = []
         if with_target:
@@ -243,7 +228,6 @@ class DataUtils(object):
                 formatted_line = self.obtain_formatted_line(line, with_target=with_target)
                 formatted_lines.append(formatted_line)
         return formatted_lines
-
 
 
 
@@ -259,8 +243,6 @@ class DataUtils(object):
             test_data = None
 
         return (train_data, valid_data, test_data)
-
-
 
 
 
@@ -340,7 +322,6 @@ class DataUtils(object):
 
 
 
-
 class TestDataUtils(DataUtils):
     """docstring for testDataUtils"""
 
@@ -367,15 +348,10 @@ class TestDataUtils(DataUtils):
         self.filter_fun = lambda word: len(word) >1 and word != "".join(re.findall(self.pattern,word))
 
 
-
     def get_batch_formatted_test_data(self, raw_test_data, with_target=False, batch_size=50, device=torch.device("cpu")):
-
         formatted_lines = self.obtain_formatted_lines(raw_test_data, with_target=with_target)
         batch_formatted_data = self.get_batch_data(formatted_lines, with_target, batch_size=batch_size, device=device)
-
         return batch_formatted_data
-
-
 
 
 
