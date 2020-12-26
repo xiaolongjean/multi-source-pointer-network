@@ -236,7 +236,7 @@ class BeamSearch:
 
             # Use the beam indices to extract the corresponding classes.
             # shape: (batch_size, beam_size)
-            restricted_predicted_classes = reshaped_predicted_classes.gather(1, restricted_beam_indices)
+            restricted_predicted_classes = reshaped_predicted_classes.gather(1, restricted_beam_indices.long())
 
             predictions.append(restricted_predicted_classes)
 
@@ -264,7 +264,7 @@ class BeamSearch:
                 # shape: (batch_size * beam_size, *)
                 state[key] = state_tensor.\
                         reshape(batch_size, self.beam_size, *last_dims).\
-                        gather(1, expanded_backpointer).\
+                        gather(1, expanded_backpointer.long()).\
                         reshape(batch_size * self.beam_size, *last_dims)
 
         if not torch.isfinite(last_log_probabilities).all():
@@ -282,15 +282,15 @@ class BeamSearch:
 
         for timestep in range(len(predictions) - 2, 0, -1):
             # shape: (batch_size, beam_size, 1)
-            cur_preds = predictions[timestep].gather(1, cur_backpointers).unsqueeze(2)
+            cur_preds = predictions[timestep].gather(1, cur_backpointers.long()).unsqueeze(2)
 
             reconstructed_predictions.append(cur_preds)
 
             # shape: (batch_size, beam_size)
-            cur_backpointers = backpointers[timestep - 1].gather(1, cur_backpointers)
+            cur_backpointers = backpointers[timestep - 1].gather(1, cur_backpointers.long())
 
         # shape: (batch_size, beam_size, 1)
-        final_preds = predictions[0].gather(1, cur_backpointers).unsqueeze(2)
+        final_preds = predictions[0].gather(1, cur_backpointers.long()).unsqueeze(2)
 
         reconstructed_predictions.append(final_preds)
 
