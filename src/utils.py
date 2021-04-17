@@ -2,14 +2,9 @@
 # -*- coding:utf-8 -*-
 
 
-
 import sys
-import os
 import subprocess
 import torch
-import torch.nn as nn
-from math import ceil
-from nltk.translate.bleu_score import sentence_bleu
 from nltk.translate.bleu_score import corpus_bleu
 
 try:
@@ -17,10 +12,6 @@ try:
 except ImportError:
     # resource doesn't exist on Windows systems
     resource = None
-
-
-
-
 
 
 def set_cuda_device(cuda_device, verbose=True):
@@ -35,7 +26,7 @@ def set_cuda_device(cuda_device, verbose=True):
     assert isinstance(cuda_device, int) and cuda_device in available_cuda_device_ids, \
            f"Error: Wrong CUDA Device Value Encountered! It Should in {available_cuda_device_ids}\n"
 
-    if cuda_device >=0 and cuda_device < available_cuda_device_num:
+    if cuda_device >= 0 and cuda_device < available_cuda_device_num:
         device = torch.device("cuda:"+str(cuda_device))
         torch.cuda.set_device(device)
         cuda_device_id = torch.cuda.current_device()
@@ -51,8 +42,6 @@ def set_cuda_device(cuda_device, verbose=True):
             print("\033[31m[INFO] Device ID: %s \n\n\033[0m" % device) 
 
     return device
-
-
 
 
 def peak_memory_mb():
@@ -81,9 +70,6 @@ def peak_memory_mb():
         return peak / 1_000
 
 
-
-
-
 def gpu_memory_mb():
     """
     Get the current GPU memory usage.
@@ -106,26 +92,20 @@ def gpu_memory_mb():
     except FileNotFoundError:
         # `nvidia-smi` doesn't exist, assume that means no GPU.
         return {}
-    except:
+    except Exception:
         # Catch *all* exceptions, because this memory check is a nice-to-have
         # and we'd never want a training run to fail because of it.
-        logger.exception("unable to check gpu_memory_mb(), continuing")
+        # logger.exception("unable to check gpu_memory_mb(), continuing")
         return {}
 
 
-
-
-
 def color(value, pattern):
-    if pattern == 1: # Red
+    if pattern == 1:  # Red
         return "\033[31m%s\033[0m" % value
-    elif pattern == 2: # Yellow
+    elif pattern == 2:  # Yellow
         return "\033[33m%s\033[0m" % value
     else:
         return value
-
-
-
 
 
 def hardware_info_printer():
@@ -137,20 +117,14 @@ def hardware_info_printer():
     print("\n")
 
 
-
-
-
-
-def get_BLEU_score(predicted_tokens, reference_ans):
+def get_bleu_score(predicted_tokens, reference_ans):
     # two references for one document
-    #from nltk.translate.bleu_score import corpus_bleu
-    references = [[['this', 'is', 'a', 'test'], ['this', 'is' 'test']]]
-    candidates = [['this', 'is', 'a', 'test']]
-    score = corpus_bleu(references, candidates)
+    # from nltk.translate.bleu_score import corpus_bleu
+    # references = [[['this', 'is', 'a', 'test'], ['this', 'is' 'test']]]
+    # candidates = [['this', 'is', 'a', 'test']]
+    # score = corpus_bleu(references, candidates)
+    score = corpus_bleu(reference_ans, predicted_tokens)
     return score
-
-
-
 
 
 def logsumexp(tensor: torch.Tensor,
@@ -176,9 +150,6 @@ def logsumexp(tensor: torch.Tensor,
     else:
         stable_vec = tensor - max_score.unsqueeze(dim)
     return max_score + (stable_vec.exp().sum(dim, keepdim=keepdim)).log()
-
-
-
 
 
 def weighted_sum(matrix: torch.Tensor, attention: torch.Tensor) -> torch.Tensor:
@@ -214,12 +185,10 @@ def weighted_sum(matrix: torch.Tensor, attention: torch.Tensor) -> torch.Tensor:
         expanded_size = list(matrix.size())
         for i in range(attention.dim() - matrix.dim() + 1):
             matrix = matrix.unsqueeze(1)
-            expanded_size.insert(i + 1, attention.size(i + 1))
+            expanded_size.insert(i + 1, attention.size()[i + 1])
         matrix = matrix.expand(*expanded_size)
     intermediate = attention.unsqueeze(-1).expand_as(matrix) * matrix
     return intermediate.sum(dim=-2)
-
-
 
 
 def clamp_tensor(tensor, minimum, maximum):
@@ -237,24 +206,21 @@ def clamp_tensor(tensor, minimum, maximum):
         return tensor.clamp(minimum, maximum)
 
 
-
-
-def rescale_gradients(model, grad_norm = None):
+def rescale_gradients(model, grad_norm=None):
     """
     Performs gradient rescaling. Is a no-op if gradient rescaling is not enabled.
     """
-    if grad_norm:
-        parameters_to_clip = [p for p in model.parameters()
-                              if p.grad is not None]
-        return sparse_clip_norm(parameters_to_clip, grad_norm)
-    return None
+    # if grad_norm:
+    #     parameters_to_clip = [p for p in model.parameters()
+    #                           if p.grad is not None]
+    #     return sparse_clip_norm(parameters_to_clip, grad_norm)
+    # return None
+    raise NotImplementedError
 
 
-from torch.nn.utils import clip_grad_norm
+# from torch.nn.utils import clip_grad_norm
 def gradient_clipping(model, grad_clipping):
-    if grad_clipping is not None:
-        for parameter in model.parameters():
-            if parameter.requires_grad:
-                parameter.register_hook(lambda grad: nn_util.clamp_tensor(grad,
-                                                                          minimum=-grad_clipping,
-                                                                          maximum=grad_clipping))
+    for parameter in model.parameters():
+        if not parameter.requires_grad:
+            continue
+        parameter.register_hook(lambda grad: torch.clamp(grad, min=-grad_clipping, max=grad_clipping))
