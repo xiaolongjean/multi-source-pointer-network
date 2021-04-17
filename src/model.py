@@ -59,7 +59,6 @@ class PositionalEmbedding(nn.Module):
 
 class AdditiveAttention(nn.Module):
     """
-    ----------
     vector_dim : ``int``
         The dimension of the vector, ``x``, described above.  This is ``x.size()[-1]`` - the length
         of the vector that will go into the similarity computation.  We need this so we can build

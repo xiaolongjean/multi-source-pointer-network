@@ -16,19 +16,16 @@
 # -----------------------------------------------------------------------------------
 import time
 import logging
+import datetime
 import torch
 import torch.nn as nn
-import datetime
 from tqdm import tqdm
 from model import MS_Pointer
 from data import DataUtils
 from config import config
 from torch import optim
-from utils import color
 from tensorboardX import SummaryWriter
-from utils import set_cuda_device, gradient_clipping
-from utils import peak_memory_mb, gpu_memory_mb
-from utils import hardware_info_printer
+from utils import color, hardware_info_printer, set_cuda_device
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
@@ -36,8 +33,8 @@ logging.basicConfig(level=logging.INFO, format='\033[31m[%(levelname)s]\033[0m %
 logger = logging.getLogger(__name__)
  
 
-def epoch_info_printer(epoch, mean_loss, epoch_time, total_time, lr, train_samples, valid_samples=0, 
-                       valid_loss=None, mean_blue=None, valid_time=0):
+def epoch_info_printer(epoch, mean_loss, epoch_time, total_time, lr, train_samples, valid_samples=0,
+                       valid_loss=None, mean_blue=None, valid_time=0.0):
 
     valid_loss = round(valid_loss, 5) if valid_loss else None
     valid_blue = round(mean_blue, 5) if mean_blue else None
@@ -73,6 +70,7 @@ def train(args):
     optimizer = optim.Adam(model.parameters(), args.lr)
     train_state["optimizer"] = optimizer.state_dict()
 
+    lr_scheduler = None
     if args.flag_lr_schedule:
         lr_scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.9, patience=args.lr_patience, verbose=True)
         train_state["lr_scheduler"] = lr_scheduler.state_dict()
@@ -185,10 +183,10 @@ def test(args):
 
 if __name__ == "__main__":
     # Basic Config ...
-    args = config()
+    config = config()
     
     # Model Training ...
-    train(args)
+    train(config)
     
     # Model Testing ...
-    # test(args)
+    # test(config)
