@@ -113,20 +113,9 @@ class MS_Pointer(nn.Module):
         self.char_num = len(self.char2index)
         self.word_num = len(self.word2index)
 
-        self.beam_size = args.beam_size
-        self.max_decoding_steps = args.max_decoding_steps
-
-        self.max_token_len = args.max_token_len
         self.max_seq_len = args.max_seq_len
-
-        self.PAD_idx = args.PAD_idx
-        self.BOS_idx = args.BOS_idx
-        self.EOS_idx = args.EOS_idx
-        self.OOV_idx = args.OOV_idx
-        self.PAD_token = args.PAD_token
-        self.BOS_token = args.BOS_token
-        self.EOS_token = args.EOS_token
-        self.OOV_token = args.OOV_token
+        self.max_token_len = args.max_token_len
+        self.max_decoding_steps = args.max_decoding_steps
 
         self.flag_use_layernorm = args.flag_use_layernorm
         self.flag_use_dropout = args.flag_use_dropout
@@ -140,8 +129,8 @@ class MS_Pointer(nn.Module):
         self.decoder_input_dim = self.encoder_output_dim_1 + self.encoder_output_dim_2 + self.target_embedding_dim
 
         # Word Embedding, Char Embedding and Positional Embeddings.
-        self.char_embeddings = nn.Embedding(self.char_num, self.embedding_dim, padding_idx=self.PAD_idx)
-        self.word_embeddings = nn.Embedding(self.word_num, self.embedding_dim, padding_idx=self.PAD_idx)
+        self.char_embeddings = nn.Embedding(self.char_num, self.embedding_dim, padding_idx=self.args.PAD_idx)
+        self.word_embeddings = nn.Embedding(self.word_num, self.embedding_dim, padding_idx=self.args.PAD_idx)
         if self.flag_use_position_embedding:
             self.position_embeddings = PositionalEmbedding(self.embedding_dim, self.max_seq_len)
 
@@ -170,7 +159,7 @@ class MS_Pointer(nn.Module):
         self.decoder_cell = nn.modules.LSTMCell(input_size=self.decoder_input_dim,
                                                 hidden_size=self.decoder_output_dim, bias=True)
         self.beam_search = BeamSearch(self.max_seq_len * 2-1, max_steps=self.max_decoding_steps,
-                                      beam_size=self.beam_size)
+                                      beam_size=self.args.beam_size)
         self.test_data_utils = TestDataUtils(self.args, self.word2index, self.char2index)
         
         if self.flag_use_layernorm:
@@ -192,12 +181,12 @@ class MS_Pointer(nn.Module):
             for single_instance_word in target_word_ids.tolist():
                 word = self.index2word[single_instance_word]
 
-                if word in [self.PAD_token, self.BOS_token, self.EOS_token, self.OOV_token]:
-                    char_ids = self.max_token_len * [self.char2index.get(word, self.OOV_idx)]
+                if word in [self.args.PAD_token, self.args.BOS_token, self.args.EOS_token, self.args.OOV_token]:
+                    char_ids = self.max_token_len * [self.char2index.get(word, self.args.OOV_idx)]
                 else:
-                    char_ids = [self.char2index.get(char, self.OOV_idx) for char in word]
+                    char_ids = [self.char2index.get(char, self.args.OOV_idx) for char in word]
                     char_ids = char_ids[0:self.max_token_len] if self.max_token_len < len(char_ids) \
-                        else char_ids + (self.max_token_len - len(char_ids)) * [self.PAD_idx]
+                        else char_ids + (self.max_token_len - len(char_ids)) * [self.args.PAD_idx]
                 target_char_ids.append(char_ids)
 
             return torch.LongTensor(target_char_ids).to(self.device)
@@ -400,7 +389,8 @@ class MS_Pointer(nn.Module):
         step_log_likelihood = logsumexp(torch.cat((item_1, item_2), -1))
         return step_log_likelihood
 
-    def merge_final_log_probs(self, source1_decoder_attention_score, 
+    def merge_final_log_probs(self,
+                              source1_decoder_attention_score,
                               source2_decoder_attention_score,
                               source1_local_words_ids, 
                               source2_local_words_ids, 
@@ -472,7 +462,7 @@ class MS_Pointer(nn.Module):
         # merged_source_local_ids = batch_input["merged_source_local_ids"]
 
         batch_size = source1_input_words_ids.size()[0]
-        start_token_ids = source1_input_words_ids.new_full((batch_size,), fill_value=self.BOS_idx)
+        start_token_ids = source1_input_words_ids.new_full((batch_size,), fill_value=self.args.BOS_idx)
         
         all_top_k_predictions, log_probabilities = self.beam_search.search(start_token_ids, batch_input, model_state,
                                                                            self.take_search_step)
@@ -518,7 +508,8 @@ class MS_Pointer(nn.Module):
 
     def predict(self, raw_test_data):
         """
-            args: raw_test_data
+        args:
+            raw_test_data
                 raw_test_data should be a three-order list:
                 [
                     [[instance-1 source-1 words], [instance-1 source-2 words]],
@@ -526,12 +517,11 @@ class MS_Pointer(nn.Module):
                     ... ...
                     [[instance-n source-1 words], [instance-n source-2 words]],
                 ]
-            return:
-                all_batch_predicted_tokens: a three-order list with following shape: 
-                    (batch_size, beam_size, target_length)
-
-                all_batch_predicted_probs : a three-order list with following shape:
-                    (batch_size, beam_size, target_length)
+        return:
+            all_batch_predicted_tokens:
+                a three-order list with shape (batch_size, beam_size, target_length)
+            all_batch_predicted_probs :
+                a three-order list with shape (batch_size, beam_size, target_length)
         """
 
         # Set self.training as 'False' when predict to stop updating running variables of normalization or dropout 
@@ -582,11 +572,11 @@ class MS_Pointer(nn.Module):
 
                 pred_corpus = [[word_list[0: 2]] for word_list in predicted_tokens[:, 0, :].tolist()]
                 bleu_score = corpus_bleu(pred_corpus, batch["target_word_list"], weights=[0.5, 0.5])
-                all_batch_bleu += bleu_score 
-
+                all_batch_bleu += bleu_score
                 batch_elapsed_time = round(time.time() - batch_start_time, 2)
-                info = color("[Valid] ", 1) + "Batch:" + color(idx, 2) + " BLEU:" + color(round(bleu_score, 5), 1) + \
-                       " Loss:" + color(round(mean_loss, 5), 1) + " Time:" + color(batch_elapsed_time, 2)
+
+                info = f"{color('[Valid]', 1)} Batch:{color(idx, 2)}  BLEU:{color(round(bleu_score, 5), 1)} " \
+                       f"Loss:{color(round(mean_loss, 5), 1)} Time:{color(batch_elapsed_time, 2)}"
                 batch_generator.set_description(desc=info, refresh=True)
         else:
             for idx, batch in enumerate(batch_generator):
@@ -596,17 +586,19 @@ class MS_Pointer(nn.Module):
                 all_batch_loss += valid_loss["batch_loss"].detach().cpu().item()
 
                 bleu_score = "None"
-
                 batch_elapsed_time = round(time.time() - batch_start_time, 2)
-                info = color("[Valid] ", 1) + "Batch:" + color(idx, 2) + " BLEU:" + color(bleu_score, 1) + " Loss:" +\
-                       color(round(mean_loss, 5), 1) + " Time:" + color(batch_elapsed_time, 2)
+
+                info = f"{color('[Valid]', 1)} Batch:{color(idx, 2)}  BLEU:{color(bleu_score, 1)} " \
+                       f"Loss:{color(round(mean_loss, 5), 1)} Time:{color(batch_elapsed_time, 2)}"
                 batch_generator.set_description(desc=info, refresh=True)
 
         mean_blue = all_batch_bleu/batch_size
         return all_batch_loss, mean_blue, all_batch_predicted_tokens, all_batch_predicted_probs
 
     def __call__(self, raw_test_data):
-        """Call the predict function."""
+        """
+        Call the predict function.
+        """
         return self.predict(raw_test_data)
 
     def __enter__(self, *args, **kwargs):
