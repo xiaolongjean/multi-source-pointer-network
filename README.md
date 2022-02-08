@@ -25,7 +25,7 @@
 
 模型编码器部分的整体结构如下图所示，解码器部分后面会进行补充。
 
-![encoder](./figs/encoder.jpg)
+![encoder](figs/encoder.jpg)
 
 
 
