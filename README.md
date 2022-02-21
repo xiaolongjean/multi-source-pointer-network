@@ -31,9 +31,9 @@
 
 **模型在推理阶段采用了局部拷贝机制，将每个训练样本的source1和source2的tokens动态地映射成局部id，计算token概率分布，并按照局部token id进行token的概率合并。**
 
-Step-1: 对于每个训练样本，利用两个输入源的tokens来动态构造局部的token词典，
+Step-1: 对于每个训练样本，利用两个输入源的tokens来动态构地造局部的token词典。
 
-Step-2: 基于该token词典，分别将两个输入源的tokens序列映射成局部id序列，
+Step-2: 基于该token词典，分别将两个输入源的tokens序列映射成局部id序列。
 
 Step-3: 分别得到两个输入源的所有tokens关于解码器的概率分布source1 probs和source2 probs。
 
