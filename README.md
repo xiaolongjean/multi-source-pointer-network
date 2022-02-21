@@ -23,9 +23,27 @@
 
 ### 二、网络结构：
 
-模型编码器部分的整体结构如下图所示，解码器部分后面会进行补充。
+**模型编码器部分的整体结构如下图所示，解码器部分后面会进行补充。**
 
 ![encoder](figs/encoder.jpg)
+
+
+
+**模型在推理阶段采用了局部拷贝机制，将每个训练样本的source1和source2的tokens动态地映射成局部id，计算token概率分布，并按照局部token id进行token的概率合并。**
+
+Step-1: 对于每个训练样本，利用两个输入源的tokens来动态构造局部的token词典，
+
+Step-2: 基于该token词典，分别将两个输入源的tokens序列映射成局部id序列，
+
+Step-3: 分别得到两个输入源的所有tokens关于解码器的概率分布source1 probs和source2 probs。
+
+Step-4: 将两个输入源的概率分布进行merge，并取概率最大的token id。
+
+Step-5: 利用Step-1构造的局部动态词典将概率最大的token id映射成对应的token，得到当前时刻的预测token。
+
+![inference](/figs/inference.jpg)
+
+
 
 
 
